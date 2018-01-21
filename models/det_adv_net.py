@@ -26,9 +26,9 @@ class DET_ADV_NET:
 
         # adversarial loss
         # for discriminator:
-        dis_adv_loss = tf.reduce_mean(-tf.log(torf_Ib)-tf.log(1-torf_Ib_hat), axis=1)
+        dis_adv_loss = tf.reduce_mean(-tf.log(torf_Ib)-tf.log(1-torf_Ib_hat))
         # for generator:
-        gen_adv_loss = tf.reduce_mean(-tf.log(torf_Ib_hat), axis=1)
+        gen_adv_loss = tf.reduce_mean(-tf.log(torf_Ib_hat))
 
         # combination generator loss
         gen_loss = gen_adv_loss + self.l1_adv_weight * l1_loss
@@ -96,7 +96,7 @@ class DET_ADV_NET:
         rate = [4, 4]   # num of patches for row and col
         assert(img_sz[0]%rate[0] == 0 and img_sz[1]%rate[1] == 0)
         patch_size = [1, img_sz[0]/rate[0], img_sz[1]/rate[1], 1]
-        layers = [64, 128, 256, 512, 1]
+        layers = [64, 64, 128, 128, 256, 512, 1]
 
         # extract patches from large image and send into discriminator as a batch
         Ih_patches = tf.extract_image_patches(Ih, ksizes=patch_size, strides=patch_size)
@@ -114,8 +114,12 @@ class DET_ADV_NET:
                                 strides=(2,2), padding="valid", activation=tf.nn.leaky_relu)
             conv4 = tf.layers.conv2d(inputs=conv3, filters=layers[3], kernel_size=[4,4],
                                 strides=(2,2), padding="valid", activation=tf.nn.leaky_relu)
-            torf  = tf.layers.conv2d(inputs=conv4, filters=layers[4], kernel_size=[4,4],
-                                strides=(4,4), padding="valid", activation=tf.sigmoid)
+            conv5 = tf.layers.conv2d(inputs=conv4, filters=layers[4], kernel_size=[4,4],
+                                strides=(2,2), padding="valid", activation=tf.nn.leaky_relu)
+            conv6 = tf.layers.conv2d(inputs=conv5, filters=layers[5], kernel_size=[4,4],
+                                strides=(2,2), padding="valid", activation=tf.nn.leaky_relu)
+            torf  = tf.layers.conv2d(inputs=conv6, filters=layers[6], kernel_size=[4,4],
+                                strides=(2,2), padding="valid", activation=tf.sigmoid)
 
         # reshape results from the same image back to the same batch
         torf = tf.reduce_mean(tf.reshape(torf, [-1, rate[0]*rate[1]]), 1)
