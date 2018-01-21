@@ -28,10 +28,13 @@ class DET_ADV_NET:
         # for discriminator:
         dis_adv_loss = tf.reduce_mean(-tf.log(torf_Ib)-tf.log(1-torf_Ib_hat), axis=1)
         # for generator:
-        gen_adv_loss = tf.reduce_mean(-tf.log(torf_Ib_hat), axis=1) + self.l1_adv_weight*l1_loss
+        gen_adv_loss = tf.reduce_mean(-tf.log(torf_Ib_hat), axis=1)
 
-        self.l1_loss, self.dis_adv_loss, self.gen_adv_loss = \
-            l1_loss, dis_adv_loss, gen_adv_loss
+        # combination generator loss
+        gen_loss = gen_adv_loss + self.l1_adv_weight * l1_loss
+
+        self.l1_loss, self.dis_adv_loss, self.gen_adv_loss, self.gen_loss = \
+            l1_loss, dis_adv_loss, gen_adv_loss, gen_loss
 
 
     def __transfer__(self, Ih):
