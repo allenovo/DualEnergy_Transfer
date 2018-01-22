@@ -94,7 +94,7 @@ def augment_Img(IB_stack, IH_stack, img_size):
     IB_aug = []
     IH_aug = []
 
-    num_aug = 1
+    num_aug = 40
 
     for n in range(num_aug):
         print('Augmentation process iteration #%s' % (n + 1))
@@ -129,6 +129,8 @@ def augment_Img(IB_stack, IH_stack, img_size):
             IB_aug.append(np.reshape(IB_crop_rot, (1, img_size, img_size)))
             IH_aug.append(np.reshape(IH_crop_rot, (1, img_size, img_size)))
 
+    IB_aug.append(np.transpose(IB_stack, [2, 0, 1]))
+    IH_aug.append(np.transpose(IH_stack, [2, 0, 1]))
     IB_aug = np.concatenate(IB_aug, axis=0)
     IH_aug = np.concatenate(IH_aug, axis=0)
 
@@ -157,32 +159,36 @@ def load_from_hdf5(hf_H_path, hf_B_path):
 
 ## main program
 if __name__ == '__main__':
-    Path_Data = 'data/'
+    # augment data
+    Path_Data = '/Users/Boris/Desktop/CycleGAN-DECC/Data'
     IB_stack, IH_stack = load_Img(Path_Data, img_size=1024)
     IB_aug_stack, IH_aug_stack = augment_Img(IB_stack, IH_stack, img_size=1024)
-    
+
     # save into .h5 file
-    hf_B = h5py.File('data/IB.h5', 'w')
+    hf_B = h5py.File('IB.h5', 'w')
     hf_B.create_dataset('IB', data=IB_aug_stack)
     hf_B.close()
-    
-    hf_B = h5py.File('data/IH.h5', 'w')
+
+    hf_B = h5py.File('IH.h5', 'w')
     hf_B.create_dataset('IH', data=IH_aug_stack)
     hf_B.close()
+
 
     # load IB.h5 and IH.h5, check img
     # hf_B = h5py.File('IB.h5', 'r')
     # n_B = hf_B.get('IB')
     # hf_H = h5py.File('IH.h5', 'r')
     # n_H = hf_H.get('IH')
-
+    #
     # fig = plt.figure()
     # a = fig.add_subplot(1, 2, 1)
-    # imgplot = plt.imshow(n_H[5, :, :], cmap='gray')
+    # imgplot = plt.imshow(n_H[500, :, :], cmap='gray')
     # a.set_title('High kVp image')
-
+    #
     # a = fig.add_subplot(1, 2, 2)
-    # imgplot = plt.imshow(n_B[5, :, :], cmap='gray')
+    # imgplot = plt.imshow(n_B[500, :, :], cmap='gray')
     # a.set_title('Bone image')
-
+    #
     # plt.show()
+    #
+    # a = 1
