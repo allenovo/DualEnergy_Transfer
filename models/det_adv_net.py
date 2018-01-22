@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 
-class DET_ADV_NET:
+class DET_ADV_NET:  # Dual Energy Transfer with Adversarial Loss
 
     def __init__(self, img_sz):
         self.l1_adv_weight = 1
