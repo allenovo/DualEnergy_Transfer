@@ -1,11 +1,12 @@
 import os
 import math
-import numpy as np
 import dicom
-from scipy import ndimage as nd
-import matplotlib.pyplot as plt
 import random
 import h5py
+import numpy as np
+import matplotlib.pyplot as plt
+
+from scipy import ndimage as nd
 
 
 def montage(imgs, shape):
@@ -21,16 +22,16 @@ def montage(imgs, shape):
 
 
 def normalize(imgs):
-    # TODO!
-    pass
+    imgs_max = np.amax(imgs, axis=(1,2))
+    return imgs / imgs_max, imgs_max
 
 
-def denormalize(imgs):
-    # TODO!
-    pass
+def denormalize(imgs, imgs_max):
+    return imgs * imgs_max
 
-## Load the Bone image & High kVp image
+
 def load_Img(Path_Data, img_size):
+    # Load the Bone image & High kVp image
     for dirName, subdirList, fileList in sorted(os.walk(Path_Data)):
         IB_stack = np.zeros((img_size, img_size, subdirList.__len__()), dtype=np.uint16)
         IH_stack = np.zeros((img_size, img_size, subdirList.__len__()), dtype=np.uint16)
@@ -144,34 +145,44 @@ def augment_Img(IB_stack, IH_stack, img_size):
 
     return IB_aug, IH_aug
 
+
+def load_from_hdf5(hf_H_path, hf_B_path):
+    hf_B = h5py.File(hf_B_path, 'r')
+    Ib_data = hf_B.get('IB')
+    hf_H = h5py.File(hf_H_path, 'r')
+    Ih_data = hf_H.get('IH')
+
+    return Ih_data, Ib_data
+
+
 ## main program
 if __name__ == '__main__':
-    # Path_Data = '/Users/Boris/Desktop/CycleGAN-DECC/Data'
-    # IB_stack, IH_stack = load_Img(Path_Data, img_size=1024)
-    # IB_aug_stack, IH_aug_stack = augment_Img(IB_stack, IH_stack, img_size=1024)
-    #
-    # # save into .h5 file
-    # hf_B = h5py.File('IB.h5', 'w')
-    # hf_B.create_dataset('IB', data=IB_aug_stack)
-    # hf_B.close()
-    #
-    # hf_B = h5py.File('IH.h5', 'w')
-    # hf_B.create_dataset('IH', data=IH_aug_stack)
-    # hf_B.close()
+    Path_Data = 'data/'
+    IB_stack, IH_stack = load_Img(Path_Data, img_size=1024)
+    IB_aug_stack, IH_aug_stack = augment_Img(IB_stack, IH_stack, img_size=1024)
+    
+    # save into .h5 file
+    hf_B = h5py.File('data/IB.h5', 'w')
+    hf_B.create_dataset('IB', data=IB_aug_stack)
+    hf_B.close()
+    
+    hf_B = h5py.File('data/IH.h5', 'w')
+    hf_B.create_dataset('IH', data=IH_aug_stack)
+    hf_B.close()
 
     # load IB.h5 and IH.h5, check img
-    hf_B = h5py.File('IB.h5', 'r')
-    n_B = hf_B.get('IB')
-    hf_H = h5py.File('IH.h5', 'r')
-    n_H = hf_H.get('IH')
+    # hf_B = h5py.File('IB.h5', 'r')
+    # n_B = hf_B.get('IB')
+    # hf_H = h5py.File('IH.h5', 'r')
+    # n_H = hf_H.get('IH')
 
-    fig = plt.figure()
-    a = fig.add_subplot(1, 2, 1)
-    imgplot = plt.imshow(n_H[5, :, :], cmap='gray')
-    a.set_title('High kVp image')
+    # fig = plt.figure()
+    # a = fig.add_subplot(1, 2, 1)
+    # imgplot = plt.imshow(n_H[5, :, :], cmap='gray')
+    # a.set_title('High kVp image')
 
-    a = fig.add_subplot(1, 2, 2)
-    imgplot = plt.imshow(n_B[5, :, :], cmap='gray')
-    a.set_title('Bone image')
+    # a = fig.add_subplot(1, 2, 2)
+    # imgplot = plt.imshow(n_B[5, :, :], cmap='gray')
+    # a.set_title('Bone image')
 
-    plt.show()
+    # plt.show()

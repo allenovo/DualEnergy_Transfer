@@ -1,11 +1,16 @@
 from __future__ import print_function
+
 import os
+import sys
+import ipdb
 import math
 import h5py
 import numpy as np
 import tensorflow as tf
 import scipy.misc as sm
 import matplotlib.pyplot as plt
+
+sys.path.insert(0, 'models/')
 
 from utilities import *
 from det_adv_net import DET_ADV_NET
@@ -21,7 +26,11 @@ def run_training(num_epoch, batch_size, lr, k):
         os.makedirs(pred_save_dir)
 
     # load data from hd5 file
-    Ih_data, Ib_data = load(...) # TODO! load data as (n, h, w, c)
+    Ih_data_raw, Ib_data_raw = load_from_hdf5('data/IH.h5', 'data/IB.h5')
+
+    # normalize data
+    Ih_data, Ih_max = normalize(Ih_data_raw)
+    Ib_data = Ib_data_raw / Ih_max
 
     # build model graph
     N = Ih_data.shape[0]
@@ -67,8 +76,8 @@ def run_training(num_epoch, batch_size, lr, k):
                     %(it+1, num_iter, dis_adv_loss, gen_adv_loss, gen_loss, l1_loss))
 
         # save transferred image
-        Ib = denormalize(Ib_data[rand_idx[0]])  # TODO! implement denormalize function in utilities
-        Ib_hat = denormalize(Ib_hat)
+        Ib = denormalize(Ib_data[rand_idx[0]], Ih_max[rand_idx[0]])
+        Ib_hat = denormalize(Ib_hat, Ih_max[rand_idx[0]])
         sm.imsave(os.path.join(pred_save_dir, '%07d.jpg'%(i+1)), montage([Ib,Ib_hat], [1,2]))
 
     # save model

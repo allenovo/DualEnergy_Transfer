@@ -105,3 +105,7 @@ ENV/
 
 # data
 data/
+
+# training files
+ckpt/
+output/
