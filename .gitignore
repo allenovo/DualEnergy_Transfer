@@ -102,3 +102,6 @@ ENV/
 
 # MAC-OS
 .DS_Store
+
+# data
+data/
