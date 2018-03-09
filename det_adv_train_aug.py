@@ -24,7 +24,7 @@ flags.DEFINE_boolean('use_ms', True, 'Whether use multi-scale or not')
 
 def run_training(num_epoch, batch_size, lr, k, m):
 
-    model_filename = 'det_adv_new_ms_hfreq_k=3_m=1'
+    model_filename = 'det_adv_w=1000_k=3_m=1'
     model_save_dir = './ckpt/'   + model_filename
     pred_save_dir  = './output/' + model_filename
     logs_save_dir  = './logs/'   + model_filename
@@ -36,20 +36,18 @@ def run_training(num_epoch, batch_size, lr, k, m):
         os.makedirs(logs_save_dir)
 
     # load data from hd5 file
-    Ih_data, Ib_data = \
-            load_from_hdf5('data/IH_train2.h5', 'data/IB_train2.h5', False)
+    Ih_data, Ih_max, Ib_data, Ib_max = \
+            load_from_hdf5('data/IH_train3_norm.h5', 'data/IB_train3_norm.h5', True)
+    Ih_val_data, Ib_val_data = \
+            load_from_hdf5('data/IH_validation3.h5', 'data/IB_validation3.h5', False)
     print('Data loading done.')
 
     # normalize data
 
-    Ih_data, Ih_max = normalize(Ih_data)
+    Ih_val_data, Ih_val_max = normalize(Ih_val_data)
     print('Normalizing Ih done.')
-    Ib_data, Ib_max = normalize(Ib_data)
+    Ib_val_data, Ib_val_max = normalize(Ib_val_data)
     print('Normalizing Ib done.')
-    # Ib_data = normalize(Ib_data_raw, Ih_max)
-
-    # gaussian filtering
-    Ih_data_gauss = gaussian_filer_batch(Ih_data)
 
     # build model graph
     N = Ih_data.shape[0]
@@ -96,67 +94,76 @@ def run_training(num_epoch, batch_size, lr, k, m):
         print('[!] Loading failed ...')
 
     # training
-    epoch_for_gen = -300
+    train_loss, val_loss = np.zeros((num_epoch,4)), np.zeros((num_epoch,4))
     gen_cnt, dis_cnt = k, m
     num_iter = int(math.ceil(N / float(batch_size)))
     print("Start training ... %d iterations per epoch" %num_iter)
     last_epoch = last_step / num_iter
-    for i in range(int(last_epoch), num_epoch):
-        rand_idx = np.random.permutation(N)
-        for it in range(num_iter):
-            idx = sorted(rand_idx[it*batch_size:min((it+1)*batch_size,N)].tolist())
-            Ih_batch, Ib_batch = Ih_data[idx], Ib_data[idx]
-            Ih_gauss_batch = Ih_data_gauss[idx]
-            if i <= epoch_for_gen:
-                train_step = train_gen_l1
-            elif gen_cnt > 0:
-                if gen_cnt == k and it % 5 == 0: print("Training Generator:")
-                train_step = train_gen
-                gen_cnt -= 1
-                if gen_cnt == 0: dis_cnt = m
-            elif dis_cnt > 0:
-                if dis_cnt == m and it % 5 == 0: print("Training Discriminator:")
-                train_step = train_dis
-                dis_cnt -= 1
-                if dis_cnt == 0: gen_cnt = k
 
-            if i >= epoch_for_gen:
+    try:
+        for i in range(int(last_epoch), num_epoch):
+            rand_idx = np.random.permutation(N)
+            for it in range(num_iter):
+                idx = sorted(rand_idx[it*batch_size:min((it+1)*batch_size,N)].tolist())
+                Ih_batch, Ib_batch = Ih_data[idx], Ib_data[idx]
+                if gen_cnt > 0:
+                    if gen_cnt == k and it % 5 == 0: print("Training Generator:")
+                    train_step = train_gen
+                    gen_cnt -= 1
+                    if gen_cnt == 0: dis_cnt = m
+                elif dis_cnt > 0:
+                    if dis_cnt == m and it % 5 == 0: print("Training Discriminator:")
+                    train_step = train_dis
+                    dis_cnt -= 1
+                    if dis_cnt == 0: gen_cnt = k
+
                 _, dis_adv_loss, gen_adv_loss, gen_loss, l1_loss = \
                    sess.run([train_step, det_adv.dis_adv_loss, det_adv.gen_adv_loss, det_adv.gen_loss, det_adv.l1_loss], \
-                             feed_dict={det_adv.Ih: Ih_batch, det_adv.Ib: Ib_batch, det_adv.Ih_gauss:Ih_gauss_batch})
-            else:
-                _, l1_loss, summary = sess.run([train_step, det_adv.l1_loss, merged], \
-                                                feed_dict={det_adv.Ih: Ih_batch, det_adv.Ib: Ib_batch, det_adv.Ih_gauss:Ih_gauss_batch})
+                             feed_dict={det_adv.Ih: Ih_batch, det_adv.Ib: Ib_batch})
 
-            if it % 5 == 0:
-                if i <= epoch_for_gen:
-                    print("\tEpoch [%d/%d] Iter [%d/%d] l1_loss=%.8f"%(i+1, num_epoch, it+1, num_iter, l1_loss))
-                else:
+                if it % 5 == 0:
                     print("\tEpoch [%d/%d] Iter [%d/%d] dis_loss=%.8f, gen_loss=%.8f, gen_adv_loss=%.8f, l1_loss=%.8f" \
-                       %(i+1, num_epoch, it+1, num_iter, dis_adv_loss, gen_loss, gen_adv_loss, l1_loss))
+                           %(i+1, num_epoch, it+1, num_iter, dis_adv_loss, gen_loss, gen_adv_loss, l1_loss))
 
-        if i <= epoch_for_gen:
-            Ib_hat, l1_loss, summary = sess.run([det_adv.Ib_hat[0], det_adv.l1_loss, merged], \
-                                                feed_dict={det_adv.Ih: Ih_batch, det_adv.Ib: Ib_batch, det_adv.Ih_gauss:Ih_gauss_batch})
-            print("Epoch [%d/%d] l1_loss=%.8f" %(i+1, num_epoch, l1_loss))
-        else:
             Ib_hat, dis_adv_loss, gen_adv_loss, gen_loss, l1_loss, summary = \
-                sess.run([det_adv.Ib_hat[0], det_adv.dis_adv_loss, det_adv.gen_adv_loss, det_adv.gen_loss, det_adv.l1_loss, merged], \
-                          feed_dict={det_adv.Ih: Ih_batch, det_adv.Ib: Ib_batch, det_adv.Ih_gauss:Ih_gauss_batch})
+                    sess.run([det_adv.Ib_hat[0], det_adv.dis_adv_loss, det_adv.gen_adv_loss, det_adv.gen_loss, det_adv.l1_loss, merged], \
+                              feed_dict={det_adv.Ih: Ih_batch, det_adv.Ib: Ib_batch})
             print("Epoch [%d/%d] dis_loss=%.8f, gen_loss=%.8f, gen_adv_loss=%.8f, l1_loss=%.8f" \
                     %(i+1, num_epoch, dis_adv_loss, gen_loss, gen_adv_loss, l1_loss))
-        sum_writer.add_summary(summary, i)
+            train_loss[i] = [dis_adv_loss, gen_adv_loss, gen_loss, l1_loss]
+            sum_writer.add_summary(summary, i)
 
-        if (i+1) % 100 == 0:
-            # save model
-            saver.save(sess, os.path.join(model_save_dir, model_filename), global_step=global_step)      
+            if (i+1) % 50 == 0:
+                # save model
+                saver.save(sess, os.path.join(model_save_dir, model_filename), global_step=global_step)      
 
-        # save transferred image
-        Ih     = normalize_to_jpeg(denormalize(Ih_data[idx[0]], Ih_max[idx[0]]))
-        Ib     = normalize_to_jpeg(denormalize(Ib_data[idx[0]], Ib_max[idx[0]]))
-        Ib_hat = normalize_to_jpeg(denormalize(Ib_hat, Ib_max[idx[0]]))
-        cv2.imwrite(os.path.join(pred_save_dir, '%07d.jpg'%(i+1)), \
-            montage([Ih[:,:,0],Ib[:,:,0],Ib_hat[:,:,0]], [1,3]))
+            # save transferred image
+            Ih     = normalize_to_jpeg(denormalize(Ih_data[idx[0]], Ih_max[idx[0]]))
+            Ib     = normalize_to_jpeg(denormalize(Ib_data[idx[0]], Ib_max[idx[0]]))
+            Ib_hat = normalize_to_jpeg(denormalize(Ib_hat, Ib_max[idx[0]]))
+            cv2.imwrite(os.path.join(pred_save_dir, '%07d.jpg'%(i+1)), \
+                montage([Ih[:,:,0],Ib[:,:,0],Ib_hat[:,:,0]], [1,3]))
+
+            # evaluate on validation set
+            N_val = Ih_val_data.shape[0]
+            num_iter_val = int(math.ceil(N_val / float(batch_size)))
+            for it in range(num_iter_val):
+                idx = range(it*batch_size,min((it+1)*batch_size,N_val))
+                Ih_batch_val, Ib_batch_val = Ih_val_data[idx], Ib_val_data[idx]
+                dis_adv_loss, gen_adv_loss, gen_loss, l1_loss = \
+                    sess.run([det_adv.dis_adv_loss, det_adv.gen_adv_loss, det_adv.gen_loss, det_adv.l1_loss], \
+                              feed_dict={det_adv.Ih: Ih_batch_val, det_adv.Ib: Ib_batch_val})
+                val_loss[i] += [dis_adv_loss, gen_adv_loss, gen_loss, l1_loss]
+            val_loss[i] /= float(num_iter_val)
+            print("Validation: dis_loss=%.8f, gen_loss=%.8f, gen_adv_loss=%.8f, l1_loss=%.8f" \
+                    %(val_loss[i][0], val_loss[i][1], val_loss[i][2], val_loss[i][3]))
+
+    except KeyboardInterrupt:
+        pass
+
+    # save loss
+    np.save(os.path.join(logs_save_dir, 'train_loss.npy'), train_loss)
+    np.save(os.path.join(logs_save_dir, 'val_loss.npy'), val_loss)
 
     # save model
     saver.save(sess, os.path.join(model_save_dir, model_filename), global_step=global_step) 
@@ -164,7 +171,7 @@ def run_training(num_epoch, batch_size, lr, k, m):
 
 def main(unused):
     num_epoch = 1000
-    batch_size = 2
+    batch_size = 3
     lr = 1e-4
     k  = 3  # num of iterations for generator to train
     m  = 1  # num of iterations for discriminator to train
